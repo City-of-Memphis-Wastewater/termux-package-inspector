@@ -210,8 +210,6 @@ impl PackageList {
 struct App {
     should_exit: bool,
     package_list: PackageList,
-    details_scroll: u16, // Track scroll position for details
-    details_height_percentage: u16, // Percentage for details section (30% by default)
 }
 
 impl App {
@@ -219,8 +217,6 @@ impl App {
         Self {
             should_exit: false,
             package_list: PackageList::load(PackageManager::Pkg),
-            details_scroll: 0,
-            details_height_percentage: 30, // Initial split: 70% list, 30% details
         }
     }
 
@@ -236,45 +232,18 @@ impl App {
                         }
                         KeyCode::Down | KeyCode::Char('j') => {
                             self.package_list.select_next();
-                            self.details_scroll = 0; // Reset scroll when selecting a new package
                         }
                         KeyCode::Up | KeyCode::Char('k') => {
                             self.package_list.select_previous();
-                            self.details_scroll = 0; // Reset scroll when selecting a new package
                         }
                         KeyCode::Home | KeyCode::Char('g') => {
                             self.package_list.select_first();
-                            self.details_scroll = 0;
                         }
                         KeyCode::End | KeyCode::Char('G') => {
                             self.package_list.select_last();
-                            self.details_scroll = 0;
                         }
                         KeyCode::Tab => {
                             self.package_list.toggle_package_manager();
-                            self.details_scroll = 0;
-                        }
-                        KeyCode::Char('J') => {
-                            // Scroll details down
-                            self.details_scroll = self.details_scroll.saturating_add(1);
-                        }
-                        KeyCode::Char('K') => {
-                            // Scroll details up
-                            self.details_scroll = self.details_scroll.saturating_sub(1);
-                        }
-                        KeyCode::Char('+') => {
-                            // Increase details section size (up to 80%)
-                            if self.details_height_percentage < 80 {
-                                self.details_height_percentage =
-                                    (self.details_height_percentage + 5).min(80);
-                            }
-                        }
-                        KeyCode::Char('-') => {
-                            // Decrease details section size (down to 10%)
-                            if self.details_height_percentage > 10 {
-                                self.details_height_percentage =
-                                    (self.details_height_percentage - 5).max(10);
-                            }
                         }
                         _ => {}
                     }
@@ -290,10 +259,7 @@ impl App {
     fn ui(&mut self, f: &mut Frame) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Percentage(100 - self.details_height_percentage),
-                Constraint::Percentage(self.details_height_percentage),
-            ])
+            .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
             .split(f.size());
 
         let list_area = chunks[0];
@@ -320,7 +286,7 @@ impl App {
 
         f.render_stateful_widget(list, list_area, &mut self.package_list.state);
 
-        // Render selected package details with scrolling
+        // Render selected package details
         let detail = if let Some(i) = self.package_list.state.selected() {
             let pkg = &self.package_list.items[i];
             self.package_list.fetch_package_details(&pkg.name)
@@ -330,8 +296,7 @@ impl App {
 
         let paragraph = Paragraph::new(detail)
             .block(Block::default().title("Package Details").borders(Borders::ALL))
-            .wrap(Wrap { trim: true })
-            .scroll((self.details_scroll, 0)); // Apply scroll offset
+            .wrap(Wrap { trim: true });
 
         f.render_widget(paragraph, detail_area);
     }
